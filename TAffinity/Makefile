@@ -1,4 +1,4 @@
-TARGETS=ex1 ex2 ex3
+TARGETS=multf dotprod
 
 CC=gcc
 
