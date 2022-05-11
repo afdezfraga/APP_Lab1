@@ -80,6 +80,10 @@ int main(int argc, char *argv[])
       x[i] = (M / 2.0 - i);
   }
 
+  double t_max, t;
+  MPI_Barrier(MPI_COMM_WORLD);
+  t = MPI_Wtime();
+
   distribute_data(rank, number_of_processes, &N, &M, &n_local, 
                   &x, sendcounts, displs, Avector, &A_local, &y_local);
 
@@ -97,8 +101,13 @@ int main(int argc, char *argv[])
   gather_results( y, y_local, n_local, number_of_processes, M, 
                   sendcounts, displs);
 
-  if(rank == ROOT_PROCESS)
+  t = MPI_Wtime() - t ;
+  MPI_Reduce( &t, &t_max, 1, MPI_DOUBLE, MPI_MAX, ROOT_PROCESS, MPI_COMM_WORLD);
+
+  if(rank == ROOT_PROCESS){
     printf("Done,  y[0] = %g  y[%d] = %g \n", y[0], N - 1, y[N - 1]);
+    printf("The parallel time is %lf\n", t_max);
+  }
 
   MPI_Finalize();
   return 0;

@@ -205,7 +205,7 @@ En este programa no se aprecian diferencias al cambiar la política. En este pro
 
 #### Modificaciones en el código
 
-En primer lugar distribuimos la cantidad de intervalos que vamos a calcular usndo un `MPI_Bcast()`.
+En primer lugar distribuimos la cantidad de intervalos que vamos a calcular usando un `MPI_Bcast()`.
 
 ```c++
 MPI_Bcast( &n , 1 , MPI_INT , MPI_ROOT_PROCESS , MPI_COMM_WORLD);
@@ -261,7 +261,81 @@ Podemos observar que el programa funciona mejor con más hilos y menos procesos,
 
 #### Modificaciones en el código
 
+En primer lugar distribuimos el tamaño de los vectores de entrada usando un `MPI_Bcast()`.
+
+```c++
+// Distribute vectors among processes
+MPI_Bcast( &N, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
+```
+
+A continuación, cada proceso calcula sobre que elementos le corresponde trabajar.
+
+```c++
+  n_local = N / number_of_processes;
+  n_resto = N % number_of_processes;
+  if (rank == ROOT_PROCESS) {
+    displs[0] = 0;
+    for (int i = 0; i < number_of_processes - 1; i++)
+    {
+      sendcounts[i] = (i < n_resto) ? n_local+1 : n_local;
+      displs[i+1] = displs[i] + sendcounts[i];
+    }
+    sendcounts[number_of_processes-1] = (number_of_processes-1 < n_resto) ? n_local+1 : n_local;
+  } else {
+    sendcounts[rank] = (rank < n_resto) ? n_local+1 : n_local;
+  }
+```
+
+Cada proceso reserva memoria para almacenar los vector de entrada.
+
+```c++
+/* Allocate memory for vectors */
+if ((x_local = (float *)malloc(sendcounts[rank] * sizeof(float))) == NULL)
+    printf("Error in malloc x_local[%d]\n", sendcounts[rank]);
+
+if ((y_local = (float *)malloc(sendcounts[rank] * sizeof(float))) == NULL)
+    printf("Error in malloc y_local[%d]\n", sendcounts[rank]);
+```
+
+El proceso 0 distribuye dichos vectores.
+
+```c++
+MPI_Scatterv( x, sendcounts, displs, 
+                MPI_FLOAT, x_local, sendcounts[rank], MPI_FLOAT, 
+                ROOT_PROCESS, MPI_COMM_WORLD);
+
+MPI_Scatterv( y, sendcounts, displs, 
+                MPI_FLOAT, y_local, sendcounts[rank], MPI_FLOAT, 
+                ROOT_PROCESS, MPI_COMM_WORLD);
+```
+
+Cada proceos calcula sobre esa partede los vectores de forma concurrente, usando un `#pragma omp parallel for`.
+
+```c++
+/* Dot product operation */
+
+dot_local = 0.;
+#pragma omp parallel for reduction(+:dot_local)
+for (i = 0; i < sendcounts[rank]; i++)
+    dot_local += x_local[i] * y_local[i];
+```
+
+Finalmente, los procesos juntan sus resultados parciales en el proceso 0 usando `MPI_Reduce()`.
+
+```c++
+MPI_Reduce( &dot_local, &dot, 
+            1, MPI_FLOAT, 
+            MPI_SUM, ROOT_PROCESS, MPI_COMM_WORLD);
+```
+
 #### Evaluación del rendimiento
+
+
+| .....          | 1 Proc - 1 Hilo   | 1 Proc - 16 Hilos | 2 Procs - 8 Hilos | 4 Procs - 4 Hilos | 8 Procs - 2 Hilos | 16 Procs - 1 Hilo |
+| :-------------:| -----------------:| -----------------:| -----------------:| -----------------:| -----------------:| -----------------:|
+| dotprod        | 8.716 s  (x1)     | 5.646 s  (x1.54)  | 5.252 s  (x1.66)  | 7.963 s  (x1.09)  | 7.668 s  (x1.14)  | 7.655 s  (x1.37)  |
+
+Podemos observar que el programa funciona mejor con más hilos y menos procesos, en concreto el programa alcanza su máximo rendimiento al usar 4 hilos por proceso o menos. El rendimiento empeora al usar 2 procesos y 8 hilos por proceso y empeora incluso más al usar un solo hilo y 16 procesos por hilo.
 
 ### Ejercicio 3: mxvnm
 -----
