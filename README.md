@@ -157,12 +157,12 @@ for(i=1;i<l-1;i++)
 #### Evaluación del rendimiento
 
 
-| .....        | 1 Hilo    | 2 Hilos     | 4 Hilos     | 8 Hilos     | 16 Hilos     |
-| :-----------:|----------:| -----------:| -----------:| -----------:| ------------:|
-| Blocking     | -.--- s   | -.--- s     | -.--- s     | -.--- s     | -.--- s      |
-| Non Blocking | -.--- s   | -.--- s     | -.--- s     | -.--- s     | -.--- s      |
+| .....          | 1 Hilo    | 2 Hilos     | 4 Hilos     | 8 Hilos     | 16 Hilos     |
+| :-------------:|----------:| -----------:| -----------:| -----------:| ------------:|
+| Sin vectorizar | 31.564 s  | 15.847 s    | 8.161 s     | 4.512 s     | 2.491 s      |
+| Vectorizado    | 18.672 s  | 9.412 s     | 4.822 s     | 2.705 s     | 1.518 s      |
 
-Observamos que el rendimiento mejora con la vectorización, en concreto se puede apreciar una mejora en el rendimiento de aproximadamente x1.75.
+Notamos que ambas versiones del programa escalan de forma cercana a lo ideal. Además, observamos que el rendimiento mejora con la vectorización, en concreto se puede apreciar una mejora en el rendimiento de aproximadamente x1.75.
 
 ## Afinidad de hilos
 
@@ -199,3 +199,73 @@ No se ha modificado el código respecto al ejercicio anterior.
 En este programa no se aprecian diferencias al cambiar la política. En este programa la complejidad aritmetica es mayor, y ese es el cuello de botella por encima de los accesos a memoría. Además usando 12 hilos en ambas politicas hay recursos hardware para dar cabida a todos los hilos, es decir, si se usasen 16 hilos, sí veriamos una mejora de la politica `close` respecto a la `master`, por poder dar cabida también a esos 4 nuevos hilos.
 
 ## Programación híbrida
+
+### Ejercicio 1: pi_integral
+-----
+
+#### Modificaciones en el código
+
+En primer lugar distribuimos la cantidad de intervalos que vamos a calcular usndo un `MPI_Bcast()`.
+
+```c++
+MPI_Bcast( &n , 1 , MPI_INT , MPI_ROOT_PROCESS , MPI_COMM_WORLD);
+```
+
+A continuación, cada proceso calcula, cuales de esos intervalos debe calcular.
+
+```c++
+    n_local = n / npes;
+    n_resto = n % npes;
+
+    // For [myid*n_local, (myid+1*n_local)-1]
+    // Do calculations
+    if (myid < n_resto){
+        start_local = myid * (n_local + 1); 
+        end_local = (myid + 1) * (n_local + 1);
+    } else {
+        start_local = (myid * n_local) + n_resto;
+        end_local = ((myid + 1) * n_local) + n_resto;
+    }
+```
+
+Cada proceos calcula esos intervalos de forma concurrente, usando un `#pragma omp parallel for`.
+
+```c++
+    // pi_local = h * sum
+    #pragma omp parallel for private(x) reduction(+:sum)
+    for (i = start_local; i < end_local; i ++) {
+        x = h * ((double)i + 0.5);   //height of the rectangle
+        sum += 4.0 / (1.0 + x*x);
+    }
+
+    pi_local = h * sum;
+```
+
+Finalmente, los procesos juntan sus resultados parciales en el proceso 0 usando `MPI_Reduce()`.
+
+```c++
+MPI_Reduce( &pi_local, &pi, 1, MPI_DOUBLE, MPI_SUM, MPI_ROOT_PROCESS, MPI_COMM_WORLD);
+```
+
+#### Evaluación del rendimiento
+
+
+| .....          | 1 Proc - 1 Hilo   | 1 Proc - 16 Hilos | 2 Procs - 8 Hilos | 4 Procs - 4 Hilos | 8 Procs - 2 Hilos | 16 Procs - 1 Hilo |
+| :-------------:| -----------------:| -----------------:| -----------------:| -----------------:| -----------------:| -----------------:|
+| pi_integral    | 4.263 s  (x1)     | 0.540 s  (x7.89)  | 0.475 s  (x8.97)  | 0.304 s  (x14.04) | 0.307 s  (x13.89) | 0.303 s  (x14.07) |
+
+Podemos observar que el programa funciona mejor con más hilos y menos procesos, en concreto el programa alcanza su máximo rendimiento al usar 4 hilos por proceso o menos. El rendimiento empeora al usar 2 procesos y 8 hilos por proceso y empeora incluso más al usar un solo hilo y 16 procesos por hilo.
+
+### Ejercicio 2: dotprod
+-----
+
+#### Modificaciones en el código
+
+#### Evaluación del rendimiento
+
+### Ejercicio 3: mxvnm
+-----
+
+#### Modificaciones en el código
+
+#### Evaluación del rendimiento

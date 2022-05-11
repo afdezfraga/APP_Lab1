@@ -58,6 +58,10 @@ char *argv[];
 
   }
 
+  double t_max, t;
+  MPI_Barrier(MPI_COMM_WORLD);
+  t = MPI_Wtime();
+
   // Distribute vectors among processes
   MPI_Bcast( &N, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
 
@@ -101,9 +105,13 @@ char *argv[];
   MPI_Reduce( &dot_local, &dot, 
               1, MPI_FLOAT, 
               MPI_SUM, ROOT_PROCESS, MPI_COMM_WORLD);
+  t = MPI_Wtime() - t ;
+  MPI_Reduce( &t, &t_max, 1, MPI_DOUBLE, MPI_MAX, MPI_ROOT_PROCESS, MPI_COMM_WORLD);
 
-  if(rank == ROOT_PROCESS)
+  if(rank == ROOT_PROCESS){
     printf("Dot product = %g\n", dot);
+    printf("The parallel time is %lf\n", t_max);
+  }
 
 
   MPI_Finalize();
