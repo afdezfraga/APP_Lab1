@@ -106,7 +106,7 @@ char *argv[];
               1, MPI_FLOAT, 
               MPI_SUM, ROOT_PROCESS, MPI_COMM_WORLD);
   t = MPI_Wtime() - t ;
-  MPI_Reduce( &t, &t_max, 1, MPI_DOUBLE, MPI_MAX, MPI_ROOT_PROCESS, MPI_COMM_WORLD);
+  MPI_Reduce( &t, &t_max, 1, MPI_DOUBLE, MPI_MAX, ROOT_PROCESS, MPI_COMM_WORLD);
 
   if(rank == ROOT_PROCESS){
     printf("Dot product = %g\n", dot);
