@@ -342,4 +342,27 @@ Podemos observar que el programa funciona mejor con más hilos y menos procesos,
 
 #### Modificaciones en el código
 
+El código se mantiene prácticamente como el orginal, salvo por 3 cambios:
+
+1. Añadimos un `#pragma omp parallel for` al bucle interno del cómputo para que se ejecute de forma concurrente
+2. Antes del cómputo añadimos una fase de distribución de datos, donde los datos de entrada se envian desde el proceso 0 a todos los procesos.
+3. Después del computo añadimos una fase de recolección de resultados, donde los resultados parciales de cada proceso se envían al proceso 0, que dispone del resultado final completo al final del programa.
+
 #### Evaluación del rendimiento
+
+| Dimensiones        | 1 Proc - 16 Hilos | 4 Procs - 4 Hilos | 16 Procs - 1 Hilo |
+|   :-------------:  | -----------------:| -----------------:| -----------------:|
+| **32768 x 32768**  | 4.454 s           | 4.949 s           | 4.966 s           |
+| **131072 x 8192**  | 5.646 s           | 5.037 s           | 4.088 s           |
+| **8192 x 131072**  | 3.864 s           | 4.977 s           | 5.038 s           |
+
+
+Para el análisis de rendimiento de este código se han elegido 3 valores para sus filas y columnas.
+
+1. Filas  =  Columnas. La matriz tiene la misma cantidad de filas que de columnas.
+2. Filas >>> Columnas. La matriz tiene muchas filas pequeñas.
+3. Filas <<< Columnas. La matriz tiene pocas filas muy grandes
+
+El programa distribuye las filas a nivel de proceso y en cada fila, procesa sus columnas de forma paralela a nivel de hilo. De esta forma que los resultados experimentales se corresponden con los esperados a nivel teórico. Al aumentar la cantidad de filas respecto a las columnas una configuración con más procesos obtiene mejor rendimiento, ya que puede aprovechar mejor el paralelismo a nivel de filas. Sin embargo, al aumentar la cantidad de columnas respecto al número de filas es una versión con más hilos la que se beneficia más, ya que es la que aprovecha el paralelismo a nivel de columna. Por último, en el caso en que las filas y las columnas estan niveladas, todas las configuraciones se benefician relativamente de su paralelismo.
+
+De esta forma una configuración híbrida funciona mejor que solo OpenMP cuando hay muchas filas muy pequeñas y funciona mejor que MPI cuando hay pocas filas muy grandes.
