@@ -1,5 +1,5 @@
 TARGETS=ex1 ex2 ex3
-MATH_TARGETS=jacobi jacobiVect
+MATH_TARGETS=jacobi jacobiVect swim-parallel swim-parallel-vect
 
 CC=gcc
 
