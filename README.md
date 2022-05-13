@@ -1,9 +1,5 @@
 # APP_Lab1
 
-## Introducción
-
-algo de intro tatatatatatt...
-
 ## Vectorización
 
 ### Ejercicio 1: multf
@@ -11,11 +7,11 @@ algo de intro tatatatatatt...
 
 #### Modificaciones en el código
 
-El código consta de un triple bucle, donde las iteraciones tienen la misma carga de trabajo. Debido a esto se paralelizará el bucle más externo, dividiendo sus iteraciones entre los hilos. Además se añadirá vectorización, incluyendo la clausula `#pragma omp simd` en el bucle más interno.
+El código consta de un triple bucle, donde las iteraciones tienen la misma carga de trabajo. Debido a esto se paralelizará el bucle más externo, dividiendo sus iteraciones entre los hilos. Además se añadirá vectorización, incluyendo la cláusula `#pragma omp simd` en el bucle más interno.
 
 De esta forma el triple bucle quedaría de la siguiente manera:
 
-```c++
+```c
 #pragma omp parallel for private(i,j,k,temp) schedule(static)
 for(i=0;i< NRA;i++)
     for(j=0;j< NCB;j++)
@@ -43,9 +39,9 @@ El programa escala de forma cercana a lo ideal al aumentar el número de hilos. 
 
 #### Modificaciones en el código
 
-Se han modificado los bucles indicados para permitir vectorización añadiendo la clausula `#pragma omp simd`.
+Se han modificado los bucles indicados para permitir vectorización añadiendo la cláusula `#pragma omp simd`.
 
-```c++
+```c
 for (k = 0; k < NREPS;k++) {
     #pragma omp simd
     for(j= 0; j< N; j++){
@@ -63,9 +59,9 @@ for (k = 0; k < NREPS;k++) {
 }
 ```
 
-Además sobre las cabezeras de las funcioens indicadas se ha añadido la clausula `#pragma omp declase simd` para permitir su vectorización. 
+Además sobre las cabeceras de las funciones indicadas se ha añadido la cláusula `#pragma omp declase simd` para permitir su vectorización. 
 
-```c++
+```c
 #pragma omp declare simd notinbranch aligned(X,Y:32) uniform(X,Y,a) linear(i:1)
 void saxpy ( float *X, float *Y, int i, float a)
 
@@ -88,7 +84,7 @@ float saxpyi( float x, float y, float a)
 | Sin vectorizar | 1.269 s   | 1.034 s   |
 | Vectorizado    | 1.126 s   | 0.621 s   | 
 
-Vemos que existe una ligerísima mejora al introducir vectorización en el Finnisterrae, sin embargo la mejora es mucho más notable en otros sistemas, como mi ordenador local, que obtiene aceleraciones similares al Finnisterrae en el resto de situaciones.
+Vemos que existe una ligerísima mejora al introducir vectorización en el Finisterrae, sin embargo la mejora es mucho más notable en otros sistemas, como mi ordenador local, que obtiene aceleraciones similares al Finisterrae en el resto de situaciones.
 
 (1) Procesador de mi ordenador local: Intel(R) Core(TM) i7-10870H CPU @ 2.20GHz.
 
@@ -111,7 +107,7 @@ En los cuatro bucles del código añadimos la directiva `#pragma omp parallel fo
 | Sin vectorizar | 1.305 s   | 0.658 s     | 0.346 s     |
 | Vectorizado    | 1.158 s   | 0.572 s     | 0.303 s     |
 
-Observamos que al aumentar la cantidad de hilos la versión 'saxpyi' escala mejor que la versión 'saxpy'. Además notamos que la vectorización sigue añadiendo una mejora muy ligera al rendimiento del programa en todos los casos, aunque cada vez más diluida al reducirse los tiempos de computo a menos de 1 segundo.
+Observamos que al aumentar la cantidad de hilos la versión 'saxpyi' escala mejor que la versión 'saxpy'. Además notamos que la vectorización sigue añadiendo una mejora muy ligera al rendimiento del programa en todos los casos, aunque cada vez más diluida al reducirse los tiempos de cómputo a menos de 1 segundo.
 
 ### Ejercicio 4: Jacobi
 -----
@@ -122,7 +118,7 @@ En la fúnción `jacobi` existen dos dobles bucles paralelizados, uno de 'inicia
 
 En ambos casos el bucle externo está paralelizado con un `pragma omp parallel for`, en concreto:
 
-```c++
+```c
 /* Copy new solution into old*/
 #pragma omp parallel for private(i,j)
 for(i=0;i<l;i++)
@@ -136,9 +132,9 @@ for(i=1;i<l-1;i++)
         ...
 ```
 
-Lo principal a tener en cuenta es que en el doble bucle principal, la variable `error` es una variable de reducción. Quitando esto, la vectorización en completamente directa, añadiendo la cláusula `pragma omp simd` al buble interno. El resultado quedaría de la siguiente forma:
+Lo principal a tener en cuenta es que en el doble bucle principal, la variable `error` es una variable de reducción. Quitando esto, la vectorización en completamente directa, añadiendo la cláusula `pragma omp simd` al bucle interno. El resultado quedaría de la siguiente forma:
 
-```c++
+```c
 /* Copy new solution into old*/
 #pragma omp parallel for private(i,j)
 for(i=0;i<l;i++)
@@ -164,6 +160,30 @@ for(i=1;i<l-1;i++)
 
 Notamos que ambas versiones del programa escalan de forma cercana a lo ideal. Además, observamos que el rendimiento mejora con la vectorización, en concreto se puede apreciar una mejora en el rendimiento de aproximadamente x1.75.
 
+### Ejercicio 5: Swim
+-----
+
+#### Modificaciones en el código
+
+Se han modificado los bucles en las funciones calc1, calc2 y calc3.
+
+La mayoría de bucles se pueden vectorizar sin mayor problema, sin embargo el doble bucle principal de las funciones calc1 y calc2 no es tan simple. Existen dependencias entre las iteraciones y openmp no es capaz de autovectorizar estos bucles.
+
+Por lo tanto, en estos bucles aplicamos loop fision, para separar las partes vectorizables, de las partes con dependencias. Tras esto hicimos una pequeña evaluación experimental que demostró que en determinados casos, se perdía más con el loop fision de lo que se ganaba con la vectorización. Tras estos pasos llegamos a la versión final de la herramienta.
+
+Cabe destacar que en los bucles vectorizados en los que fuese necesario se cambió la política de `static` a `simd:static`.
+
+#### Evaluación del rendimiento
+
+La evaluación de rendimiento se ha realizado usando el fichero `swim.in.ref`.
+
+| .....          | 1 Hilo    | 2 Hilos     | 4 Hilos     |
+| :-------------:|----------:| -----------:| -----------:|
+| Sin vectorizar | 21.925 s  | 10.875 s    | 5.700 s     |
+| Vectorizado    | 17.736 s  | 9.221 s     | 4.991 s     |
+
+En este caso podemos ver que los beneficios de la vectorización, pese a ser significativos, son mucho menores que en otros casos, ya que los bucles computacionalmente más costosos solo se pueden vectorizar parcialmente, por lo que la mejora introducida por la vectorización es menos notable. La aceleración que se consigue oscila entre el 20% y el 15% y tiende a descender según aumenta el número de hilos.
+
 ## Afinidad de hilos
 
 ### Ejercicio 1: dotprod
@@ -171,7 +191,7 @@ Notamos que ambas versiones del programa escalan de forma cercana a lo ideal. Ad
 
 #### Modificaciones en el código
 
-Se ha añadido la clausula `#pragma omp parallel for` al buble principal para paralelizar el código.
+Se ha añadido la cláusula `#pragma omp parallel for` al bucle principal para paralelizar el código.
 
 #### Evaluación del rendimiento
 
@@ -180,7 +200,7 @@ Se ha añadido la clausula `#pragma omp parallel for` al buble principal para pa
 | Master       | 1.921 s                       |
 | Spread       | 8.487 s                       |
 
-Este programa tiene muy poca complejidad aritmetica, es decir, es claramente memory bound. Por eso, la gestión de la gerarquía de memoria es muy importante para obtener un buen rendimiento. Los datos son inicializados por completo por el hilo principal, por lo que están en su memoria. Usando la política `master` los holos se ejecutan en el mismo lugar que el hilo principal y por tanto esa memoria esta cerca de ellos. Usando la politica `spread`, los hilos se separan entre los sockets, lo que causa más latencia en los accesos a memoria empeorando el rendimiento del programa.
+Este programa tiene muy poca complejidad aritmética, es decir, es claramente memory bound. Por eso, la gestión de la jerarquía de memoria es muy importante para obtener un buen rendimiento. Los datos son inicializados por completo por el hilo principal, por lo que están en su memoria. Usando la política `master` los hilos se ejecutan en el mismo lugar que el hilo principal y por tanto esa memoria está cerca de ellos. Usando la política `spread`, los hilos se separan entre los sockets, lo que causa más latencia en los accesos a memoria empeorando el rendimiento del programa.
 
 ### Ejercicio 2: multf
 -----
@@ -196,7 +216,7 @@ No se ha modificado el código respecto al ejercicio anterior.
 | Master       | 0.404 s                       |
 | Close        | 0.402 s                       |
 
-En este programa no se aprecian diferencias al cambiar la política. En este programa la complejidad aritmetica es mayor, y ese es el cuello de botella por encima de los accesos a memoría. Además usando 12 hilos en ambas politicas hay recursos hardware para dar cabida a todos los hilos, es decir, si se usasen 16 hilos, sí veriamos una mejora de la politica `close` respecto a la `master`, por poder dar cabida también a esos 4 nuevos hilos.
+En este programa no se aprecian diferencias al cambiar la política. En este programa la complejidad aritmética es mayor, y ese es el cuello de botella por encima de los accesos a memoría. Además usando 12 hilos en ambas políticas hay recursos hardware para dar cabida a todos los hilos, es decir, si se usasen 16 hilos, sí veríamos una mejora de la política `close` respecto a la `master`, por poder dar cabida también a estos 4 nuevos hilos.
 
 ## Programación híbrida
 
@@ -207,13 +227,13 @@ En este programa no se aprecian diferencias al cambiar la política. En este pro
 
 En primer lugar distribuimos la cantidad de intervalos que vamos a calcular usando un `MPI_Bcast()`.
 
-```c++
+```c
 MPI_Bcast( &n , 1 , MPI_INT , MPI_ROOT_PROCESS , MPI_COMM_WORLD);
 ```
 
-A continuación, cada proceso calcula, cuales de esos intervalos debe calcular.
+A continuación, cada proceso calcula, cuáles de esos intervalos debe calcular.
 
-```c++
+```c
     n_local = n / npes;
     n_resto = n % npes;
 
@@ -228,9 +248,9 @@ A continuación, cada proceso calcula, cuales de esos intervalos debe calcular.
     }
 ```
 
-Cada proceos calcula esos intervalos de forma concurrente, usando un `#pragma omp parallel for`.
+Cada proceso calcula esos intervalos de forma concurrente, usando un `#pragma omp parallel for`.
 
-```c++
+```c
     // pi_local = h * sum
     #pragma omp parallel for private(x) reduction(+:sum)
     for (i = start_local; i < end_local; i ++) {
@@ -243,7 +263,7 @@ Cada proceos calcula esos intervalos de forma concurrente, usando un `#pragma om
 
 Finalmente, los procesos juntan sus resultados parciales en el proceso 0 usando `MPI_Reduce()`.
 
-```c++
+```c
 MPI_Reduce( &pi_local, &pi, 1, MPI_DOUBLE, MPI_SUM, MPI_ROOT_PROCESS, MPI_COMM_WORLD);
 ```
 
@@ -263,14 +283,14 @@ Podemos observar que el programa funciona mejor con más hilos y menos procesos,
 
 En primer lugar distribuimos el tamaño de los vectores de entrada usando un `MPI_Bcast()`.
 
-```c++
+```c
 // Distribute vectors among processes
 MPI_Bcast( &N, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
 ```
 
-A continuación, cada proceso calcula sobre que elementos le corresponde trabajar.
+A continuación, cada proceso calcula sobre qué elementos le corresponde trabajar.
 
-```c++
+```c
   n_local = N / number_of_processes;
   n_resto = N % number_of_processes;
   if (rank == ROOT_PROCESS) {
@@ -286,9 +306,9 @@ A continuación, cada proceso calcula sobre que elementos le corresponde trabaja
   }
 ```
 
-Cada proceso reserva memoria para almacenar los vector de entrada.
+Cada proceso reserva memoria para almacenar los vectores de entrada.
 
-```c++
+```c
 /* Allocate memory for vectors */
 if ((x_local = (float *)malloc(sendcounts[rank] * sizeof(float))) == NULL)
     printf("Error in malloc x_local[%d]\n", sendcounts[rank]);
@@ -299,7 +319,7 @@ if ((y_local = (float *)malloc(sendcounts[rank] * sizeof(float))) == NULL)
 
 El proceso 0 distribuye dichos vectores.
 
-```c++
+```c
 MPI_Scatterv( x, sendcounts, displs, 
                 MPI_FLOAT, x_local, sendcounts[rank], MPI_FLOAT, 
                 ROOT_PROCESS, MPI_COMM_WORLD);
@@ -309,9 +329,9 @@ MPI_Scatterv( y, sendcounts, displs,
                 ROOT_PROCESS, MPI_COMM_WORLD);
 ```
 
-Cada proceos calcula sobre esa partede los vectores de forma concurrente, usando un `#pragma omp parallel for`.
+Cada proceso calcula sobre esa parte de los vectores de forma concurrente, usando un `#pragma omp parallel for`.
 
-```c++
+```c
 /* Dot product operation */
 
 dot_local = 0.;
@@ -322,7 +342,7 @@ for (i = 0; i < sendcounts[rank]; i++)
 
 Finalmente, los procesos juntan sus resultados parciales en el proceso 0 usando `MPI_Reduce()`.
 
-```c++
+```c
 MPI_Reduce( &dot_local, &dot, 
             1, MPI_FLOAT, 
             MPI_SUM, ROOT_PROCESS, MPI_COMM_WORLD);
@@ -342,11 +362,11 @@ Podemos observar que el programa funciona mejor con más hilos y menos procesos,
 
 #### Modificaciones en el código
 
-El código se mantiene prácticamente como el orginal, salvo por 3 cambios:
+El código se mantiene prácticamente como el original, salvo por 3 cambios:
 
 1. Añadimos un `#pragma omp parallel for` al bucle interno del cómputo para que se ejecute de forma concurrente
-2. Antes del cómputo añadimos una fase de distribución de datos, donde los datos de entrada se envian desde el proceso 0 a todos los procesos.
-3. Después del computo añadimos una fase de recolección de resultados, donde los resultados parciales de cada proceso se envían al proceso 0, que dispone del resultado final completo al final del programa.
+2. Antes del cómputo añadimos una fase de distribución de datos, donde los datos de entrada se envían desde el proceso 0 a todos los procesos.
+3. Después del cómputo añadimos una fase de recolección de resultados, donde los resultados parciales de cada proceso se envían al proceso 0, que dispone del resultado final completo al final del programa.
 
 #### Evaluación del rendimiento
 
@@ -363,6 +383,6 @@ Para el análisis de rendimiento de este código se han elegido 3 valores para s
 2. Filas >>> Columnas. La matriz tiene muchas filas pequeñas.
 3. Filas <<< Columnas. La matriz tiene pocas filas muy grandes
 
-El programa distribuye las filas a nivel de proceso y en cada fila, procesa sus columnas de forma paralela a nivel de hilo. De esta forma que los resultados experimentales se corresponden con los esperados a nivel teórico. Al aumentar la cantidad de filas respecto a las columnas una configuración con más procesos obtiene mejor rendimiento, ya que puede aprovechar mejor el paralelismo a nivel de filas. Sin embargo, al aumentar la cantidad de columnas respecto al número de filas es una versión con más hilos la que se beneficia más, ya que es la que aprovecha el paralelismo a nivel de columna. Por último, en el caso en que las filas y las columnas estan niveladas, todas las configuraciones se benefician relativamente de su paralelismo.
+El programa distribuye las filas a nivel de proceso y en cada fila, procesa sus columnas de forma paralela a nivel de hilo. De esta forma los resultados experimentales se corresponden con los esperados a nivel teórico. Al aumentar la cantidad de filas respecto a las columnas una configuración con más procesos obtiene mejor rendimiento, ya que puede aprovechar mejor el paralelismo a nivel de filas. Sin embargo, al aumentar la cantidad de columnas respecto al número de filas es una versión con más hilos la que se beneficia más, ya que es la que aprovecha el paralelismo a nivel de columna. Por último, en el caso en que las filas y las columnas están niveladas, todas las configuraciones se benefician relativamente de su paralelismo.
 
 De esta forma una configuración híbrida funciona mejor que solo OpenMP cuando hay muchas filas muy pequeñas y funciona mejor que MPI cuando hay pocas filas muy grandes.
